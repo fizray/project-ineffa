@@ -448,6 +448,7 @@ class UISystem:
             "E - Enroll new user",
             "S - Save snapshot",
             "R - Reset detection",
+            "T - Reset attendance cooldown",
             "H - Show this help",
             "Q - Quit application",
             "",
@@ -458,7 +459,7 @@ class UISystem:
             f"- Liveness required: Yes"
         ]
         
-        help_img = np.zeros((400, 600, 3), dtype=np.uint8)
+        help_img = np.zeros((450, 600, 3), dtype=np.uint8)
         
         y_offset = 30
         for line in help_text:
@@ -472,9 +473,14 @@ class UISystem:
             cv2.putText(help_img, line, (20, y_offset), self.font, 0.6, color, 1)
             y_offset += 25
         
-        cv2.imshow("Help", help_img)
-        cv2.waitKey(0)
-        cv2.destroyWindow("Help")
+        try:
+            cv2.imshow("Help", help_img)
+            cv2.waitKey(0)
+            if cv2.getWindowProperty("Help", cv2.WND_PROP_VISIBLE) >= 0:
+                cv2.destroyWindow("Help")
+        except:
+            # If window operations fail, just continue
+            pass
     
     def cleanup(self):
         """Clean up UI resources"""
