@@ -5,3 +5,4 @@ snapshots/*
 data/captures/*
 attendance.csv
 embeddings.json
+config.yaml
