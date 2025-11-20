@@ -1,12 +1,12 @@
 # Core Processing
-numpy>=1.24.0
-opencv-python>=4.8.0
+numpy<2.0.0
+opencv-python<4.10.0
 Pillow>=10.0.0
 
 # AI & ML Models
 ultralytics>=8.0.0        # For YOLOv8 Detection
 insightface>=0.7.3        # For ArcFace Recognition & RetinaFace
-onnxruntime-gpu>=1.16.0   # GPU Acceleration (Use onnxruntime if CPU only)
+onnxruntime-gpu==1.16.3   # GPU Acceleration (Pinned for CUDA 11.8 compatibility)
 
 # Utilities
 pyyaml>=6.0               # Config management

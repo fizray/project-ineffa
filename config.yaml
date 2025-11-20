@@ -11,9 +11,9 @@ input:
   source: 0 
   # source: "rtsp://admin:password@192.168.1.100:554/cam1"
   
-  width: 1280
-  height: 720
-  fps_limit: 30
+  width: 1920
+  height: 1080
+  fps_limit: 60
   reconnect_delay: 5 # Seconds to wait before reconnecting RTSP
 
 detection:
