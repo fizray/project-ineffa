@@ -16,39 +16,61 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 logger = logging.getLogger("Enrollment")
 
 class EnrollmentSystem:
+    """
+    Handles the enrollment of new users into the system.
+    Captures face samples, extracts embeddings, and saves them to the database.
+    """
     def __init__(self, config_path="config.yaml"):
+        """
+        Initializes the EnrollmentSystem.
+
+        Args:
+            config_path (str): Path to the configuration YAML file.
+        """
         self.config = self._load_config(config_path)
         self.embeddings_path = self.config['storage']['embeddings_path']
-        
+
         # Initialize InsightFace
         providers = ['CUDAExecutionProvider', 'CPUExecutionProvider'] if self.config['system']['gpu_enabled'] else ['CPUExecutionProvider']
         logger.info(f"Initializing InsightFace with providers: {providers}")
-        
+
         self.insightface_app = FaceAnalysis(
-            name=self.config['detection']['model_name'], 
-            allowed_modules=['detection', 'recognition'], 
+            name=self.config['detection']['model_name'],
+            allowed_modules=['detection', 'recognition'],
             providers=providers
         )
         self.insightface_app.prepare(ctx_id=0, det_size=(self.config['detection']['input_size'], self.config['detection']['input_size']))
-        
+
         self.detector = FaceDetector(
             app=self.insightface_app,
             conf_threshold=self.config['detection']['confidence_threshold'],
             nms_threshold=self.config['detection']['nms_threshold']
         )
-        
+
         self.recognizer = RecognitionEngine(
             app=self.insightface_app
         )
-        
+
         self.known_embeddings = {}
         self._load_embeddings()
 
     def _load_config(self, path):
+        """
+        Loads the YAML configuration file.
+
+        Args:
+            path (str): Path to the YAML file.
+
+        Returns:
+            dict: Parsed configuration.
+        """
         with open(path, 'r') as f:
             return yaml.safe_load(f)
 
     def _load_embeddings(self):
+        """
+        Loads existing embeddings from the storage file.
+        """
         if os.path.exists(self.embeddings_path):
             try:
                 with open(self.embeddings_path, 'r') as f:
@@ -61,6 +83,9 @@ class EnrollmentSystem:
             self.known_embeddings = {}
 
     def _save_embeddings(self):
+        """
+        Saves the current state of known_embeddings to the storage file.
+        """
         try:
             # Convert numpy arrays to lists for JSON serialization if needed
             # But we store them as lists in memory for this tool to be safe
@@ -71,6 +96,14 @@ class EnrollmentSystem:
             logger.error(f"Failed to save embeddings: {e}")
 
     def enroll_user(self, user_id, user_name, num_samples=5):
+        """
+        Interactive process to capture face samples from the camera.
+
+        Args:
+            user_id (str): Unique identifier for the user.
+            user_name (str): Display name for the user.
+            num_samples (int): Number of face samples to collect.
+        """
         cap = cv2.VideoCapture(self.config['input']['source'])
         if not cap.isOpened():
             logger.error("Cannot open camera")
@@ -81,7 +114,7 @@ class EnrollmentSystem:
         logger.info("Press 'c' to capture a sample, 'q' to quit.")
 
         collected_embeddings = []
-        
+
         while len(collected_embeddings) < num_samples:
             ret, frame = cap.read()
             if not ret:
@@ -100,11 +133,11 @@ class EnrollmentSystem:
             else:
                 face = faces[0]
                 bbox = face.bbox.astype(int)
-                
+
                 # Quality Checks
                 h = bbox[3] - bbox[1]
                 w = bbox[2] - bbox[0]
-                
+
                 if h < self.config['recognition']['min_face_size']:
                     status_text = "Too Far / Small"
                 else:
@@ -141,10 +174,10 @@ class EnrollmentSystem:
                     "name": user_name,
                     "embeddings": []
                 }
-            
+
             self.known_embeddings[user_id]["embeddings"].extend(collected_embeddings)
             self.known_embeddings[user_id]["updated_at"] = datetime.now().isoformat()
-            
+
             self._save_embeddings()
             logger.info(f"Successfully enrolled {user_name} with {len(collected_embeddings)} new samples.")
         else:
@@ -155,8 +188,8 @@ if __name__ == "__main__":
     parser.add_argument("--id", type=str, required=True, help="Unique User ID")
     parser.add_argument("--name", type=str, required=True, help="User Display Name")
     parser.add_argument("--samples", type=int, default=5, help="Number of samples to collect")
-    
+
     args = parser.parse_args()
-    
+
     system = EnrollmentSystem()
     system.enroll_user(args.id, args.name, args.samples)

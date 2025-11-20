@@ -2,7 +2,20 @@ import numpy as np
 from collections import OrderedDict
 
 class CentroidTracker:
+    """
+    A simple object tracker that uses centroids to track objects across frames.
+    It associates objects based on the Euclidean distance between their centroids.
+    """
     def __init__(self, max_disappeared=30, max_distance=50):
+        """
+        Initializes the CentroidTracker.
+
+        Args:
+            max_disappeared (int): The number of consecutive frames an object can be lost
+                                   before it is deregistered.
+            max_distance (int): The maximum distance between centroids to consider them
+                                the same object.
+        """
         self.next_object_id = 0
         self.objects = OrderedDict()
         self.disappeared = OrderedDict()
@@ -10,19 +23,35 @@ class CentroidTracker:
         self.max_distance = max_distance
 
     def register(self, centroid):
+        """
+        Registers a new object with a unique ID.
+
+        Args:
+            centroid (numpy.ndarray): The (x, y) coordinates of the object's centroid.
+        """
         self.objects[self.next_object_id] = centroid
         self.disappeared[self.next_object_id] = 0
         self.next_object_id += 1
 
     def deregister(self, object_id):
+        """
+        Removes an object from tracking.
+
+        Args:
+            object_id (int): The ID of the object to remove.
+        """
         del self.objects[object_id]
         del self.disappeared[object_id]
 
     def update(self, rects):
         """
-        Update the tracker with a list of bounding box rectangles.
-        rects format: [(x1, y1, x2, y2), ...]
-        Returns: dictionary of (objectID, centroid)
+        Updates the tracker with a list of bounding box rectangles from the current frame.
+
+        Args:
+            rects (list): A list of bounding boxes in the format [(x1, y1, x2, y2), ...].
+
+        Returns:
+            OrderedDict: A dictionary mapping object IDs to their current centroids (x, y).
         """
         if len(rects) == 0:
             for object_id in list(self.disappeared.keys()):
@@ -84,6 +113,16 @@ class CentroidTracker:
         return self.objects
 
     def _compute_distance(self, a, b):
+        """
+        Computes the Euclidean distance matrix between two sets of points.
+
+        Args:
+            a (numpy.ndarray): Array of points (N, 2).
+            b (numpy.ndarray): Array of points (M, 2).
+
+        Returns:
+            numpy.ndarray: Distance matrix (N, M).
+        """
         # Euclidean distance
         # a: (N, 2), b: (M, 2)
         # Returns (N, M) distance matrix

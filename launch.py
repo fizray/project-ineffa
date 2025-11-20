@@ -5,14 +5,23 @@ import time
 import shutil
 
 def clear_screen():
+    """
+    Clears the console screen depending on the operating system.
+    """
     os.system('cls' if os.name == 'nt' else 'clear')
 
 def print_header():
+    """
+    Prints the application header to the console.
+    """
     print("\033[96m==================================================\033[0m")
     print("\033[1m          FACE ATTENDANCE SYSTEM LAUNCHER         \033[0m")
     print("\033[96m==================================================\033[0m")
 
 def run_attendance():
+    """
+    Launches the main attendance system script.
+    """
     print("\n\033[93m[INFO] Starting Attendance System...\033[0m")
     try:
         subprocess.run([sys.executable, "main.py"], check=True)
@@ -23,6 +32,9 @@ def run_attendance():
     input("\nPress Enter to return to menu...")
 
 def run_enrollment():
+    """
+    Collects user input and launches the enrollment tool script.
+    """
     print("\n\033[93m[INFO] New User Enrollment\033[0m")
     user_id = input("Enter User ID (e.g., 1001): ").strip()
     if not user_id:
@@ -39,29 +51,47 @@ def run_enrollment():
     try:
         samples = input("Number of samples (default 5): ").strip()
         samples = int(samples) if samples.isdigit() else 5
-        
+
         cmd = [sys.executable, "enrollment_tool.py", "--id", user_id, "--name", name, "--samples", str(samples)]
         subprocess.run(cmd, check=True)
     except KeyboardInterrupt:
         pass
     except subprocess.CalledProcessError:
         print("\n\033[91m[ERROR] Enrollment failed.\033[0m")
-    
+
     input("\nPress Enter to return to menu...")
 
 def run_verification():
+    """
+    Runs the system verification script to check dependencies and setup.
+    """
     print("\n\033[93m[INFO] Running System Verification...\033[0m")
     script_path = os.path.join("scripts", "verify_setup.ps1")
-    if os.path.exists(script_path):
+
+    # Fallback for non-Windows or if ps1 doesn't exist, we could check python deps
+    if os.name == 'nt' and os.path.exists(script_path):
         try:
             subprocess.run(["powershell", "-ExecutionPolicy", "Bypass", "-File", script_path], check=True)
         except Exception as e:
             print(f"\033[91mFailed to run verification script: {e}\033[0m")
     else:
-        print("\033[91mVerification script not found!\033[0m")
+        # Simple python check
+        print("Checking Python dependencies...")
+        try:
+            import cv2
+            import insightface
+            import numpy
+            import yaml
+            print("\033[92mCore dependencies found.\033[0m")
+        except ImportError as e:
+            print(f"\033[91mMissing dependency: {e}\033[0m")
+
     input("\nPress Enter to return to menu...")
 
 def clean_logs():
+    """
+    Deletes the attendance log file after user confirmation.
+    """
     confirm = input("\n\033[91mAre you sure you want to clear attendance logs? (y/n): \033[0m")
     if confirm.lower() == 'y':
         log_path = os.path.join("data", "attendance.csv")
@@ -76,6 +106,9 @@ def clean_logs():
     time.sleep(1)
 
 def main():
+    """
+    Main loop for the launcher menu.
+    """
     while True:
         clear_screen()
         print_header()
@@ -85,9 +118,9 @@ def main():
         print("4. \033[90mClear Attendance Logs\033[0m")
         print("0. Exit")
         print("\033[96m==================================================\033[0m")
-        
+
         choice = input("Select option: ").strip()
-        
+
         if choice == '1':
             run_attendance()
         elif choice == '2':
