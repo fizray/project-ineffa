@@ -12,6 +12,7 @@ from core.face_detection import FaceDetector
 from core.embedding_extractor import RecognitionEngine
 from core.tracker import CentroidTracker
 from core.ui_system import UISystem
+from core.attendance_manager import AttendanceManager
 from insightface.app import FaceAnalysis
 from numpy.linalg import norm
 
@@ -25,6 +26,7 @@ class AttendanceSystem:
         
         # Initialize Modules
         self.ui = UISystem(self.config)
+        self.attendance_manager = AttendanceManager(self.config)
         self.stream = RTSPStreamLoader(
             source=self.config['input']['source'],
             width=self.config['input']['width'],
@@ -32,16 +34,7 @@ class AttendanceSystem:
             reconnect_delay=self.config['input']['reconnect_delay']
         )
         
-        # Initialize Shared InsightFace App
-        providers = ['CUDAExecutionProvider', 'CPUExecutionProvider'] if self.config['system']['gpu_enabled'] else ['CPUExecutionProvider']
-        logger.info(f"Initializing InsightFace with providers: {providers}")
-        
-        self.insightface_app = FaceAnalysis(
-            name=self.config['detection']['model_name'], 
-            allowed_modules=['detection', 'recognition'], 
-            providers=providers
-        )
-        self.insightface_app.prepare(ctx_id=0, det_size=(self.config['detection']['input_size'], self.config['detection']['input_size']))
+        self._init_insightface()
         
         self.detector = FaceDetector(
             app=self.insightface_app,
@@ -61,8 +54,6 @@ class AttendanceSystem:
         # State
         self.known_face_encodings = [] # Matrix (N, 512)
         self.known_face_names = []     # List of N names
-        self.attendance_log = {} # {name: last_seen_timestamp}
-        self.recent_logs = [] # List of {'name': str, 'time': str} for UI
         self.tracked_faces_state = {} # {object_id: {'name': str, 'processed': bool, 'best_score': float}}
         
         self._load_embeddings()
@@ -70,6 +61,18 @@ class AttendanceSystem:
     def _load_config(self, path):
         with open(path, 'r') as f:
             return yaml.safe_load(f)
+
+    def _init_insightface(self):
+        # Initialize Shared InsightFace App
+        providers = ['CUDAExecutionProvider', 'CPUExecutionProvider'] if self.config['system']['gpu_enabled'] else ['CPUExecutionProvider']
+        logger.info(f"Initializing InsightFace with providers: {providers}")
+        
+        self.insightface_app = FaceAnalysis(
+            name=self.config['detection']['model_name'], 
+            allowed_modules=['detection', 'recognition'], 
+            providers=providers
+        )
+        self.insightface_app.prepare(ctx_id=0, det_size=(self.config['detection']['input_size'], self.config['detection']['input_size']))
 
     def _load_embeddings(self):
         path = self.config['storage']['embeddings_path']
@@ -124,36 +127,6 @@ class AttendanceSystem:
             
         return "Unknown", float(best_score)
 
-    def _log_attendance(self, name):
-        now = time.time()
-        cooldown = self.config['attendance']['cooldown_seconds']
-        
-        if name in self.attendance_log:
-            last_seen = self.attendance_log[name]
-            if now - last_seen < cooldown:
-                return False # Cooldown active
-        
-        self.attendance_log[name] = now
-        
-        # Write to CSV
-        log_path = self.config['storage']['logs_path']
-        timestamp_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        time_only_str = datetime.now().strftime("%H:%M:%S")
-        
-        # Update UI Log
-        self.recent_logs.append({'name': name, 'time': time_only_str})
-        if len(self.recent_logs) > 20:
-            self.recent_logs.pop(0)
-        
-        # Simple append (in production, use a proper logger or DB)
-        try:
-            with open(log_path, "a") as f:
-                f.write(f"{timestamp_str},{name}\n")
-            logger.info(f"ATTENDANCE LOGGED: {name}")
-            return True
-        except Exception as e:
-            logger.error(f"Failed to write log: {e}")
-            return False
 
     def run(self):
         self.stream.start()
@@ -165,89 +138,7 @@ class AttendanceSystem:
                 if frame is None:
                     continue
 
-                # 1. Detection
-                faces = self.detector.detect(frame)
-                
-                # Prepare rects for tracker
-                rects = []
-                for face in faces:
-                    rects.append(face.bbox.astype(int))
-                
-                # 2. Tracking
-                objects = self.tracker.update(rects)
-                
-                # Map tracker IDs back to face objects
-                # This is a heuristic mapping since tracker only knows centroids/rects
-                # We find the face object closest to the tracked centroid
-                
-                current_tracked_ids = set(objects.keys())
-                faces_map = {} # {object_id: face_object} for UI drawing
-                
-                # Clean up state for lost objects
-                for oid in list(self.tracked_faces_state.keys()):
-                    if oid not in current_tracked_ids:
-                        del self.tracked_faces_state[oid]
-
-                for object_id, centroid in objects.items():
-                    # Find the corresponding face object
-                    best_face = None
-                    min_dist = float('inf')
-                    
-                    for face in faces:
-                        # Calculate face centroid
-                        bbox = face.bbox
-                        cX = (bbox[0] + bbox[2]) / 2
-                        cY = (bbox[1] + bbox[3]) / 2
-                        dist = np.linalg.norm(np.array([cX, cY]) - centroid)
-                        
-                        if dist < self.config['tracking']['distance_threshold']:
-                            if dist < min_dist:
-                                min_dist = dist
-                                best_face = face
-                    
-                    if best_face:
-                        faces_map[object_id] = best_face
-                        # Initialize state for new ID
-                        if object_id not in self.tracked_faces_state:
-                            self.tracked_faces_state[object_id] = {
-                                'name': "Unknown",
-                                'processed': False,
-                                'best_score': 0.0,
-                                'history_count': 0
-                            }
-                        
-                        state = self.tracked_faces_state[object_id]
-                        state['history_count'] += 1
-                        
-                        # 3. Smart Recognition Logic
-                        # Only recognize if:
-                        # - Not yet processed (or Unknown)
-                        # - Face quality is good (size check)
-                        # - We haven't tried too many times (optional)
-                        
-                        face_height = best_face.bbox[3] - best_face.bbox[1]
-                        
-                        if not state['processed'] or state['name'] == "Unknown":
-                            if face_height >= self.config['recognition']['min_face_size']:
-                                # Extract Embedding
-                                embedding = self.recognizer.get_embedding(frame, best_face)
-                                if embedding is not None:
-                                    name, score = self._identify_face(embedding)
-                                    
-                                    if name != "Unknown":
-                                        state['name'] = name
-                                        state['best_score'] = score
-                                        state['processed'] = True
-                                        self._log_attendance(name)
-                                    else:
-                                        # Keep trying if unknown, maybe better angle comes up
-                                        # But don't spam recognition every frame if it's clearly unknown
-                                        pass
-
-                # Display
-                frame = self.ui.draw_dashboard(frame, self.tracked_faces_state, faces_map, self.recent_logs, is_connected=True)
-                    
-                cv2.imshow(self.config['ui']['window_name'], frame)
+                self._process_frame(frame)
                 
                 if cv2.waitKey(1) & 0xFF == ord('q'):
                     break
@@ -258,6 +149,90 @@ class AttendanceSystem:
             self.stream.stop()
             cv2.destroyAllWindows()
             logger.info("System Stopped.")
+
+    def _process_frame(self, frame):
+        # 1. Detection
+        faces = self.detector.detect(frame)
+        
+        # 2. Tracking
+        rects = [face.bbox.astype(int) for face in faces]
+        objects = self.tracker.update(rects)
+        
+        # 3. Map tracker IDs to face objects
+        faces_map = self._map_faces_to_tracker(objects, faces)
+        
+        # 4. Recognition Logic
+        self._handle_recognition(frame, faces_map)
+
+        # 5. Display
+        frame = self.ui.draw_dashboard(
+            frame, 
+            self.tracked_faces_state, 
+            faces_map, 
+            self.attendance_manager.get_recent_logs(), 
+            is_connected=True
+        )
+        cv2.imshow(self.config['ui']['window_name'], frame)
+
+    def _map_faces_to_tracker(self, objects, faces):
+        current_tracked_ids = set(objects.keys())
+        faces_map = {} # {object_id: face_object}
+        
+        # Clean up state for lost objects
+        for oid in list(self.tracked_faces_state.keys()):
+            if oid not in current_tracked_ids:
+                del self.tracked_faces_state[oid]
+
+        for object_id, centroid in objects.items():
+            # Find the corresponding face object
+            best_face = None
+            min_dist = float('inf')
+            
+            for face in faces:
+                # Calculate face centroid
+                bbox = face.bbox
+                cX = (bbox[0] + bbox[2]) / 2
+                cY = (bbox[1] + bbox[3]) / 2
+                dist = np.linalg.norm(np.array([cX, cY]) - centroid)
+                
+                if dist < self.config['tracking']['distance_threshold']:
+                    if dist < min_dist:
+                        min_dist = dist
+                        best_face = face
+            
+            if best_face:
+                faces_map[object_id] = best_face
+        
+        return faces_map
+
+    def _handle_recognition(self, frame, faces_map):
+        for object_id, face in faces_map.items():
+            # Initialize state for new ID
+            if object_id not in self.tracked_faces_state:
+                self.tracked_faces_state[object_id] = {
+                    'name': "Unknown",
+                    'processed': False,
+                    'best_score': 0.0,
+                    'history_count': 0
+                }
+            
+            state = self.tracked_faces_state[object_id]
+            state['history_count'] += 1
+            
+            face_height = face.bbox[3] - face.bbox[1]
+            
+            if not state['processed'] or state['name'] == "Unknown":
+                if face_height >= self.config['recognition']['min_face_size']:
+                    # Extract Embedding
+                    embedding = self.recognizer.get_embedding(frame, face)
+                    if embedding is not None:
+                        name, score = self._identify_face(embedding)
+                        
+                        if name != "Unknown":
+                            state['name'] = name
+                            state['best_score'] = score
+                            state['processed'] = True
+                            self.attendance_manager.log_attendance(name, frame, face.bbox)
 
 if __name__ == "__main__":
     system = AttendanceSystem()
