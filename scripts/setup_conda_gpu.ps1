@@ -71,9 +71,9 @@ try {
     conda run -n $envName pip install -r requirements.txt
     
     # Explicitly reinstall onnxruntime-gpu to ensure we have the GPU version
-    # Sometimes requirements.txt might just say 'onnxruntime' or have conflicts
+    # We MUST pin version 1.16.3 to match CUDA 11.8. Newer versions require CUDA 12.
     Write-Host "`n[4/4] Verifying ONNX Runtime GPU..." -ForegroundColor Yellow
-    conda run -n $envName pip install onnxruntime-gpu --force-reinstall
+    conda run -n $envName pip install "onnxruntime-gpu==1.16.3" --force-reinstall
     
 } catch {
     Write-Host "Error installing dependencies." -ForegroundColor Red
