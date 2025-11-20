@@ -8,25 +8,36 @@ input:
   # Source configuration
   # For Webcam: use integer (e.g., 0, 1)
   # For RTSP: use string (e.g., "rtsp://admin:pass@192.168.1.10:554/stream")
-  source: 0 
+  source: "test.mp4"
   # source: "rtsp://admin:password@192.168.1.100:554/cam1"
   
   width: 1920
   height: 1080
   fps_limit: 60
   reconnect_delay: 5 # Seconds to wait before reconnecting RTSP
+  
+  # Image Preprocessing for CCTV/Bad Lighting
+  preprocessing:
+    enable_clahe: true # Improves contrast in shadows/glare
+    clahe_clip_limit: 2.0
+    clahe_tile_grid_size: 8
 
 detection:
   # Options: "yolov8n-face", "buffalo_l" (RetinaFace), "buffalo_s"
   model_name: "buffalo_l" 
-  confidence_threshold: 0.5
+  confidence_threshold: 0.4 # Lowered for CCTV to catch harder faces
   nms_threshold: 0.4
-  input_size: 640 # Resize input for detection (640 is standard for YOLO/Retina)
+  input_size: 1280 # For CCTV, increase to 1280 or -1 (original size). Warning: Lowers FPS!
+
+liveness:
+  enabled: false 
+  model_path: "models/2.7_80x80_MiniFASNetV2.onnx"
+  threshold: 0.7
 
 recognition:
   model_name: "buffalo_l" # InsightFace model pack (contains ArcFace)
-  similarity_threshold: 0.60 # Threshold for match (Cosine Similarity)
-  min_face_size: 64 # Minimum pixel height/width to attempt recognition
+  similarity_threshold: 0.55 # Slightly lower for CCTV (faces are blurrier)
+  min_face_size: 40 # Lowered to detect faces further away
   
 tracking:
   enabled: true

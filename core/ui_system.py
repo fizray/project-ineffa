@@ -102,7 +102,11 @@ class UISystem:
                 x1, y1, x2, y2 = bbox
                 
                 # Color based on status
-                if state['name'] != "Unknown":
+                if state['name'] == "SPOOF":
+                    color = self.colors['danger']
+                    label = "SPOOF"
+                    score = f"{state['best_score']:.2f}"
+                elif state['name'] != "Unknown":
                     color = self.colors['success']
                     label = state['name']
                     score = f"{state['best_score']:.2f}"

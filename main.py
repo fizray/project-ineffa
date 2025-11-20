@@ -25,6 +25,7 @@ from datetime import datetime
 
 from core.stream_loader import RTSPStreamLoader
 from core.face_detection import FaceDetector
+from core.liveness_detector import LivenessDetector
 from core.embedding_extractor import RecognitionEngine
 from core.tracker import CentroidTracker
 from core.ui_system import UISystem
@@ -58,6 +59,8 @@ class AttendanceSystem:
             nms_threshold=self.config['detection']['nms_threshold']
         )
         
+        self.liveness_detector = LivenessDetector(self.config)
+
         self.recognizer = RecognitionEngine(
             app=self.insightface_app
         )
@@ -167,8 +170,26 @@ class AttendanceSystem:
             logger.info("System Stopped.")
 
     def _process_frame(self, frame):
-        # 1. Detection
-        faces = self.detector.detect(frame)
+        # 0. Preprocessing (CLAHE)
+        if self.config['input'].get('preprocessing', {}).get('enable_clahe', False):
+            # Apply CLAHE to L channel of LAB color space
+            lab = cv2.cvtColor(frame, cv2.COLOR_BGR2LAB)
+            l, a, b = cv2.split(lab)
+            
+            clahe = cv2.createCLAHE(
+                clipLimit=self.config['input']['preprocessing']['clahe_clip_limit'], 
+                tileGridSize=(self.config['input']['preprocessing']['clahe_tile_grid_size'], 
+                              self.config['input']['preprocessing']['clahe_tile_grid_size'])
+            )
+            cl = clahe.apply(l)
+            
+            limg = cv2.merge((cl, a, b))
+            frame_processed = cv2.cvtColor(limg, cv2.COLOR_LAB2BGR)
+        else:
+            frame_processed = frame
+
+        # 1. Detection (Use processed frame for better detection)
+        faces = self.detector.detect(frame_processed)
         
         # 2. Tracking
         rects = [face.bbox.astype(int) for face in faces]
@@ -177,18 +198,24 @@ class AttendanceSystem:
         # 3. Map tracker IDs to face objects
         faces_map = self._map_faces_to_tracker(objects, faces)
         
-        # 4. Recognition Logic
-        self._handle_recognition(frame, faces_map)
+        # 4. Recognition Logic (Pass original frame for recognition/liveness to avoid artifacts?)
+        # Actually, InsightFace often benefits from CLAHE too in bad lighting.
+        # Let's use frame_processed for consistency.
+        self._handle_recognition(frame_processed, faces_map)
 
-        # 5. Display
-        frame = self.ui.draw_dashboard(
-            frame, 
+        # 5. Display (Show original frame to user, but with overlays)
+        # Or show processed? Usually users prefer seeing the enhanced version if it's dark.
+        # Let's show the processed version if CLAHE is on, so they see what the AI sees.
+        frame_display = frame_processed if self.config['input'].get('preprocessing', {}).get('enable_clahe', False) else frame
+        
+        frame_final = self.ui.draw_dashboard(
+            frame_display, 
             self.tracked_faces_state, 
             faces_map, 
             self.attendance_manager.get_recent_logs(), 
             is_connected=True
         )
-        cv2.imshow(self.config['ui']['window_name'], frame)
+        cv2.imshow(self.config['ui']['window_name'], frame_final)
 
     def _map_faces_to_tracker(self, objects, faces):
         current_tracked_ids = set(objects.keys())
@@ -237,8 +264,19 @@ class AttendanceSystem:
             
             face_height = face.bbox[3] - face.bbox[1]
             
-            if not state['processed'] or state['name'] == "Unknown":
+            # Retry if Unknown OR previously marked as SPOOF (to recover from false positives)
+            if not state['processed'] or state['name'] in ["Unknown", "SPOOF"]:
                 if face_height >= self.config['recognition']['min_face_size']:
+                    
+                    # Liveness Check
+                    if self.config['liveness']['enabled']:
+                        is_real, score = self.liveness_detector.check_liveness(frame, face.bbox)
+                        if not is_real:
+                            state['name'] = "SPOOF"
+                            state['best_score'] = score
+                            state['processed'] = True
+                            return
+
                     # Extract Embedding
                     embedding = self.recognizer.get_embedding(frame, face)
                     if embedding is not None:
@@ -249,6 +287,10 @@ class AttendanceSystem:
                             state['best_score'] = score
                             state['processed'] = True
                             self.attendance_manager.log_attendance(name, frame, face.bbox)
+                        else:
+                            # Real but Unknown
+                            state['name'] = "Unknown"
+                            state['best_score'] = score
 
 if __name__ == "__main__":
     system = AttendanceSystem()

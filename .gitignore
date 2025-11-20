@@ -4,3 +4,4 @@ __pycache__/
 snapshots/*
 data/captures/
 data/attendance.csv
+data/embeddings.json
