@@ -6,17 +6,18 @@ Direktori `core/` berisi modul-modul Python yang menjadi komponen utama dari sis
 
 ### 1. `stream_loader.py`
 
-**Tujuan:** Mengelola pengambilan frame dari berbagai sumber video seperti webcam atau file video.
+**Tujuan:** Mengelola pengambilan frame dari berbagai sumber video seperti webcam, file video, atau stream RTSP.
 
-**Class: `StreamLoader`**
+**Class: `RTSPStreamLoader`**
 
--   **`__init__(self, source, resolution, fps)`**:
-    -   Menginisialisasi objek `VideoCapture` dari OpenCV.
-    -   Mengatur resolusi dan FPS yang diinginkan.
-    -   Memulai thread terpisah untuk membaca frame secara terus-menerus, yang mencegah pembekuan (blocking) pada thread utama.
+-   **`__init__(self, source, width, height, reconnect_delay)`**:
+    -   Menginisialisasi koneksi ke sumber video.
+    -   Mendukung webcam (index integer) dan RTSP/File (string).
+    -   Memulai thread terpisah untuk membaca frame secara terus-menerus (non-blocking).
 
 -   **`read(self)`**:
-    -   Mengembalikan frame terbaru yang telah dibaca oleh thread latar belakang.
+    -   Mengembalikan frame terbaru dari antrian (queue).
+    -   Menggunakan mekanisme bufferless (hanya menyimpan frame terakhir) untuk latensi rendah.
 
 -   **`stop(self)`**:
     -   Menghentikan thread dan melepaskan sumber video.
@@ -25,38 +26,35 @@ Direktori `core/` berisi modul-modul Python yang menjadi komponen utama dari sis
 
 ### 2. `face_detection.py`
 
-**Tujuan:** Mendeteksi lokasi wajah dalam sebuah frame menggunakan model YOLOv8.
+**Tujuan:** Mendeteksi lokasi wajah dalam sebuah frame menggunakan model dari InsightFace.
 
 **Class: `FaceDetector`**
 
--   **`__init__(self, model_path, confidence_threshold)`**:
-    -   Memuat model deteksi wajah YOLO dari path yang diberikan.
-    -   Menyimpan ambang batas kepercayaan (confidence threshold).
+-   **`__init__(self, app, conf_threshold, nms_threshold)`**:
+    -   Menerima objek aplikasi InsightFace yang sudah diinisialisasi.
+    -   Menyimpan ambang batas kepercayaan dan NMS.
 
 -   **`detect(self, frame)`**:
-    -   Menerima sebuah frame gambar.
-    -   Menjalankan inferensi model pada frame.
-    -   Menyaring hasil deteksi berdasarkan ambang batas kepercayaan.
-    -   Mengembalikan daftar kotak pembatas (bounding boxes) dari wajah yang terdeteksi.
+    -   Menjalankan deteksi wajah pada frame.
+    -   Mengembalikan daftar objek `Face` yang berisi bounding box, keypoints (landmarks), dan skor deteksi.
 
 ---
 
 ### 3. `embedding_extractor.py`
 
-**Tujuan:** Mengekstrak fitur wajah (embedding) dari gambar wajah yang telah dipotong (cropped).
+**Tujuan:** Mengekstrak fitur wajah (embedding) dan menghitung kemiripan.
 
-**Class: `EmbeddingExtractor`**
+**Class: `RecognitionEngine`**
 
--   **`__init__(self, model_path, input_size)`**:
-    -   Memuat model inferensi ONNX (misalnya, ArcFace) untuk ekstraksi embedding.
-    -   Menyimpan ukuran input yang diharapkan oleh model.
+-   **`__init__(self, app)`**:
+    -   Menggunakan model pengenalan dari aplikasi InsightFace.
 
--   **`extract(self, frame, face_bbox)`**:
-    -   Menerima frame asli dan kotak pembatas wajah.
-    -   Memotong (crop) wajah dari frame.
-    -   Melakukan pra-pemrosesan pada gambar wajah (mengubah ukuran, normalisasi).
-    -   Menjalankan inferensi untuk mendapatkan vektor embedding.
-    -   Mengembalikan embedding yang telah dinormalisasi.
+-   **`get_embedding(self, frame, face_obj)`**:
+    -   Mengekstrak vektor embedding (512-dimensi) dari wajah.
+    -   Melakukan alignment wajah otomatis berdasarkan keypoints sebelum ekstraksi.
+
+-   **`compute_similarity(self, embed1, embed2)`**:
+    -   Menghitung Cosine Similarity antara dua vektor embedding.
 
 ---
 
@@ -64,51 +62,65 @@ Direktori `core/` berisi modul-modul Python yang menjadi komponen utama dari sis
 
 **Tujuan:** Melacak wajah yang terdeteksi di beberapa frame untuk memberikan ID yang konsisten.
 
-**Class: `FaceTracker`**
+**Class: `CentroidTracker`**
 
--   **`__init__(self, max_age, min_hits, iou_threshold)`**:
-    -   Menginisialisasi objek `Sort` dari library `sort-py` dengan parameter yang diberikan.
+-   **`__init__(self, max_disappeared, max_distance)`**:
+    -   Menginisialisasi pelacak berbasis centroid.
 
--   **`update(self, detections)`**:
-    -   Menerima daftar deteksi wajah (bounding boxes) dari `FaceDetector`.
-    -   Memperbarui status pelacak.
-    -   Mengembalikan array yang berisi `[x1, y1, x2, y2, track_id]` untuk setiap wajah yang dilacak.
+-   **`update(self, rects)`**:
+    -   Menerima daftar bounding box.
+    -   Menghitung centroid (titik tengah) dari setiap box.
+    -   Mencocokkan centroid baru dengan centroid objek yang sudah ada berdasarkan jarak Euclidean terdekat.
+    -   Mengembalikan dictionary `{object_id: centroid}`.
 
 ---
 
 ### 5. `attendance_manager.py`
 
-**Tujuan:** Komponen sentral yang mengelola logika pengenalan wajah, pencocokan, dan pencatatan absensi.
+**Tujuan:** Mengelola pencatatan absensi dan penyimpanan data log.
 
 **Class: `AttendanceManager`**
 
--   **`__init__(self, embeddings_path, ...)`**:
-    -   Memuat embedding wajah yang telah terdaftar dari file JSON.
-    -   Menginisialisasi status pelacakan untuk setiap ID (misalnya, jumlah frame terdeteksi, status pengenalan).
+-   **`__init__(self, config)`**:
+    -   Memuat konfigurasi path log dan cooldown.
 
--   **`recognize_and_log(self, frame, tracked_faces)`**:
-    -   Untuk setiap wajah yang dilacak:
-        1.  Mengekstrak embedding wajah saat ini.
-        2.  Membandingkan embedding tersebut dengan semua embedding yang terdaftar menggunakan kemiripan kosinus (cosine similarity).
-        3.  Jika kemiripan melebihi `recognition_threshold` untuk nama tertentu secara konsisten (selama `consecutive_frames_for_recognition`), wajah dianggap dikenali.
-        4.  Jika wajah dikenali dan belum diabsen hari itu, catat absensi ke file CSV.
-        5.  Jika kemiripan tertinggi di bawah `unknown_threshold`, tandai sebagai "Tidak Dikenal".
-    -   Mengembalikan status pengenalan untuk setiap wajah yang dilacak.
+-   **`log_attendance(self, name, frame, bbox)`**:
+    -   Mengecek apakah pengguna sedang dalam masa "cooldown" (baru saja absen).
+    -   Jika valid, mencatat waktu dan nama ke file CSV.
+    -   Menyimpan foto wajah (snapshot) ke folder `data/captures/`.
+    -   Memperbarui log aktivitas terbaru untuk UI.
+
+-   **`get_recent_logs(self)`**:
+    -   Mengembalikan daftar log terbaru untuk ditampilkan di sidebar UI.
 
 ---
 
 ### 6. `ui_system.py`
 
-**Tujuan:** Menangani semua rendering visual, seperti menggambar kotak pembatas, nama, dan informasi lainnya pada frame.
+**Tujuan:** Menangani tampilan visual antarmuka pengguna.
 
 **Class: `UISystem`**
 
--   **`__init__(self, font_path, font_size, ...)`**:
-    -   Menginisialisasi pengaturan font dan tema warna.
+-   **`__init__(self, config)`**:
+    -   Menginisialisasi font dan palet warna.
 
--   **`display(self, frame, tracked_faces, recognition_results, fps)`**:
-    -   Menerima frame asli, hasil pelacakan, dan hasil pengenalan.
-    -   Menggambar kotak pembatas di sekitar setiap wajah. Warna kotak disesuaikan berdasarkan status (misalnya, hijau untuk "dikenali", biru untuk "tidak dikenal", oranye untuk "sedang dilacak").
-    -   Menuliskan nama atau status di atas kotak pembatas.
-    -   Jika `show_fps` diaktifkan, menampilkan FPS di sudut layar.
-    -   Mengembalikan frame yang telah dimodifikasi dan siap untuk ditampilkan.
+-   **`draw_dashboard(self, frame, tracked_faces, faces_map, recent_logs, is_connected)`**:
+    -   Menggambar kotak pembatas wajah dengan warna sesuai status (Dikenal/Hijau, Tidak Dikenal/Kuning, Spoof/Merah).
+    -   Menampilkan header status sistem (FPS, Koneksi).
+    -   Menampilkan sidebar daftar absensi terbaru.
+
+---
+
+### 7. `liveness_detector.py`
+
+**Tujuan:** Memastikan wajah yang terdeteksi adalah wajah asli (bukan foto atau layar).
+
+**Class: `LivenessDetector`**
+
+-   **`__init__(self, config)`**:
+    -   Memuat model anti-spoofing (MiniFASNetV2) dalam format ONNX.
+
+-   **`check_liveness(self, frame, bbox)`**:
+    -   Memotong area wajah dan memperluasnya (scale 2.7x) untuk konteks.
+    -   Menjalankan inferensi model liveness.
+    -   Mengembalikan `True` jika wajah asli, dan skor keasliannya.

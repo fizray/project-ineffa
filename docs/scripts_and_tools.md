@@ -9,18 +9,19 @@ Repositori ini menyertakan beberapa skrip dan alat untuk mempermudah instalasi, 
 **Tujuan:** Mendaftarkan wajah baru ke dalam sistem dengan mengambil beberapa gambar, mengekstrak embedding, dan menyimpannya.
 
 **Cara Kerja:**
-1.  Meminta pengguna memasukkan nama.
-2.  Membuka webcam dan mulai mendeteksi wajah.
-3.  Ketika wajah terdeteksi dengan jelas, alat ini akan mengambil beberapa sampel gambar (misalnya, 20 sampel).
-4.  Untuk setiap sampel, embedding wajah diekstraksi.
-5.  Rata-rata dari semua embedding yang terkumpul dihitung untuk menghasilkan satu embedding representatif untuk orang tersebut.
-6.  Nama dan embedding representatif ini kemudian disimpan ke dalam file `data/embeddings.json`.
+1.  Menerima ID dan Nama pengguna melalui argumen command line.
+2.  Membuka webcam dan mendeteksi wajah.
+3.  Memvalidasi kualitas wajah (ukuran, jumlah wajah).
+4.  Pengguna menekan tombol 'c' untuk mengambil sampel (capture).
+5.  Setelah jumlah sampel terpenuhi (default: 5), embedding disimpan ke `data/embeddings.json`.
 
 **Cara Menggunakan:**
 ```bash
-python enrollment_tool.py
+python enrollment_tool.py --id "1001" --name "Budi Santoso" --samples 5
 ```
-Ikuti instruksi di terminal dan pastikan wajah Anda terlihat jelas di depan kamera.
+-   `--id`: ID unik untuk pengguna (wajib).
+-   `--name`: Nama lengkap pengguna (wajib).
+-   `--samples`: Jumlah sampel foto yang diambil (opsional, default 5).
 
 ---
 
@@ -31,22 +32,27 @@ Ikuti instruksi di terminal dan pastikan wajah Anda terlihat jelas di depan kame
 **Alur Eksekusi:**
 1.  **Inisialisasi:**
     -   Memuat konfigurasi dari `config.yaml`.
-    -   Menginisialisasi semua objek dari modul `core`: `StreamLoader`, `FaceDetector`, `EmbeddingExtractor`, `FaceTracker`, `AttendanceManager`, dan `UISystem`.
+    -   Menginisialisasi `RTSPStreamLoader`, `FaceDetector`, `LivenessDetector`, `RecognitionEngine`, `CentroidTracker`, `AttendanceManager`, dan `UISystem`.
+    -   Memuat database embedding wajah.
 2.  **Loop Utama:**
-    -   Membaca frame dari `StreamLoader`.
-    -   Mendeteksi wajah dalam frame menggunakan `FaceDetector`.
-    -   Memperbarui pelacak dengan deteksi baru menggunakan `FaceTracker`.
-    -   Mengenali wajah yang dilacak dan mencatat absensi menggunakan `AttendanceManager`.
-    -   Menampilkan hasil (kotak pembatas, nama, FPS) pada frame menggunakan `UISystem`.
-    -   Menampilkan frame yang sudah diproses di jendela OpenCV.
+    -   Membaca frame dari stream.
+    -   **Pra-pemrosesan:** Menerapkan CLAHE (jika diaktifkan) untuk perbaikan kontras.
+    -   **Deteksi:** Mendeteksi wajah menggunakan InsightFace.
+    -   **Tracking:** Memperbarui posisi wajah dengan Centroid Tracker.
+    -   **Logika Pengenalan:**
+        -   Cek ukuran wajah minimum.
+        -   **Liveness Check:** Memastikan wajah asli (bukan spoof) menggunakan MiniFASNetV2.
+        -   **Identifikasi:** Mencocokkan embedding dengan database.
+        -   **Logging:** Mencatat absensi jika valid dan lolos cooldown.
+    -   **Tampilan:** Menggambar overlay status dan dashboard pada frame.
 3.  **Pembersihan:**
-    -   Ketika pengguna menekan tombol 'q', loop berhenti, dan semua sumber daya (seperti kamera) dilepaskan.
+    -   Menekan 'q' untuk keluar dan melepaskan resource.
 
 ---
 
 ### 3. `launch.py`
 
-**Tujuan:** Skrip sederhana untuk meluncurkan `main.py`. Ini bisa digunakan di masa depan untuk menambahkan logika tambahan sebelum aplikasi utama berjalan (misalnya, memeriksa pembaruan, mengatur variabel lingkungan).
+**Tujuan:** Skrip sederhana untuk meluncurkan `main.py`.
 
 **Cara Menggunakan:**
 ```bash
@@ -57,12 +63,12 @@ python launch.py
 
 ### 4. Skrip Setup (`setup_conda.bat`, `run_gpu.bat`, dll.)
 
--   **`setup_conda.bat`**: Skrip batch untuk Windows yang membuat lingkungan Conda baru bernama `ineffa-env`, menginstal Python, dan kemudian menginstal semua dependensi yang tercantum dalam `requirements.txt` menggunakan `pip`.
+-   **`setup_conda.bat`**: Skrip batch untuk Windows yang membuat lingkungan Conda baru, menginstal Python, dan dependensi dari `requirements.txt`.
 
--   **`run_gpu.bat`**: Contoh skrip untuk menjalankan aplikasi dengan akselerasi GPU (jika dependensi GPU telah diinstal). Biasanya, ini akan mengatur variabel lingkungan atau menggunakan versi pustaka yang dikompilasi khusus untuk GPU.
+-   **`run_gpu.bat`**: Skrip untuk menjalankan aplikasi dengan konfigurasi GPU yang optimal.
 
--   **`scripts/setup_conda_gpu.ps1`**: Skrip PowerShell yang lebih canggih untuk mengatur lingkungan Conda dengan dukungan GPU. Ini akan menginstal `cudatoolkit` dan `cudnn` dari channel `nvidia` bersama dengan `pytorch` versi GPU.
+-   **`scripts/setup_conda_gpu.ps1`**: Skrip PowerShell untuk setup lingkungan Conda dengan dukungan GPU (CUDA/cuDNN).
 
--   **`scripts/setup_gpu_windows.ps1`**: Skrip yang mungkin berisi langkah-langkah untuk menginstal driver NVIDIA dan CUDA Toolkit di tingkat sistem operasi Windows.
+-   **`scripts/setup_gpu_windows.ps1`**: Skrip instalasi driver NVIDIA dan CUDA Toolkit di Windows.
 
--   **`scripts/verify_setup.ps1`**: Skrip untuk memverifikasi bahwa semua dependensi (terutama yang terkait GPU seperti PyTorch dan CUDA) telah terinstal dengan benar dan dapat diakses oleh Python.
+-   **`scripts/verify_setup.ps1`**: Memverifikasi instalasi PyTorch dan ketersediaan CUDA.

@@ -5,94 +5,123 @@ File `config.yaml` adalah pusat kendali untuk semua pengaturan penting dalam apl
 ## Struktur Konfigurasi
 
 ```yaml
-# Pengaturan Umum
-project_name: "PROJECT INEFFA"
-version: "1.0"
+system:
+  mode: "attendance" # Options: "attendance", "enrollment"
+  gpu_enabled: true
+  debug_mode: false
+  log_level: "INFO"
 
-# Pengaturan Sumber Video
-stream_loader:
-  source: 0  # 0 untuk webcam, atau path ke file video
-  resolution: [1280, 720]
-  fps: 30
+input:
+  # Konfigurasi Sumber
+  # Untuk Webcam: gunakan integer (misal: 0, 1)
+  # Untuk RTSP: gunakan string (misal: "rtsp://admin:pass@192.168.1.10:554/stream")
+  source: 0
+  
+  width: 1920
+  height: 1080
+  fps_limit: 60
+  reconnect_delay: 5 # Detik menunggu sebelum mencoba koneksi ulang RTSP
+  
+  # Pra-pemrosesan Gambar untuk CCTV/Pencahayaan Buruk
+  preprocessing:
+    enable_clahe: true # Meningkatkan kontras pada bayangan/silau
+    clahe_clip_limit: 2.0
+    clahe_tile_grid_size: 8
 
-# Pengaturan Deteksi Wajah
-face_detection:
-  model_path: "models/yolov8n-face.pt"
-  confidence_threshold: 0.5
+detection:
+  # Options: "yolov8n-face", "buffalo_l" (RetinaFace), "buffalo_s"
+  model_name: "buffalo_l" 
+  confidence_threshold: 0.4 # Diturunkan untuk CCTV agar menangkap wajah yang sulit
+  nms_threshold: 0.4
+  input_size: 1280 # Untuk CCTV, naikkan ke 1280 atau -1 (ukuran asli). Peringatan: Menurunkan FPS!
 
-# Pengaturan Ekstraksi Embedding
-embedding_extractor:
-  model_path: "models/mobile_net_v2_arcface.onnx"
-  input_size: [112, 112]
+liveness:
+  enabled: false 
+  model_path: "models/2.7_80x80_MiniFASNetV2.onnx"
+  threshold: 0.7
 
-# Pengaturan Pelacakan (Tracker)
-tracker:
-  max_age: 30
-  min_hits: 3
-  iou_threshold: 0.3
+recognition:
+  model_name: "buffalo_l" # Paket model InsightFace (berisi ArcFace)
+  similarity_threshold: 0.55 # Sedikit lebih rendah untuk CCTV (wajah lebih buram)
+  min_face_size: 40 # Diturunkan untuk mendeteksi wajah yang lebih jauh
+  
+tracking:
+  enabled: true
+  algorithm: "centroid" # Options: "centroid", "bytetrack" (masa depan)
+  max_disappeared: 30 # Frame untuk menjaga ID tetap hidup tanpa deteksi
+  distance_threshold: 50 # Jarak piksel untuk pencocokan centroid
 
-# Pengaturan Manajer Absensi
-attendance_manager:
+attendance:
+  cooldown_seconds: 30 # Abaikan orang yang sama selama X detik setelah log
+  quality_threshold: 0.0 # Skor kualitas wajah minimum (jika tersedia) untuk diproses
+  
+storage:
   embeddings_path: "data/embeddings.json"
-  attendance_log_path: "data/attendance.csv"
-  recognition_threshold: 0.65 # Ambang batas kemiripan untuk mengenali wajah
-  unknown_threshold: 0.55   # Ambang batas untuk menandai sebagai "tidak dikenal"
-  consecutive_frames_for_recognition: 5 # Jumlah frame berturut-turut untuk konfirmasi
+  logs_path: "data/attendance.csv"
+  snapshots_path: "snapshots/"
+  gallery_path: "gallery/"
 
-# Pengaturan UI
-ui_system:
-  font_path: "C:/Windows/Fonts/Arial.ttf"
-  font_size: 16
+ui:
+  window_name: "Face Attendance System (Rebuild)"
   show_fps: true
-  theme:
-    background: [25, 25, 25]
-    text: [255, 255, 255]
-    bbox_known: [0, 255, 0]
-    bbox_unknown: [0, 0, 255]
-    bbox_tracking: [255, 165, 0]
+  show_bbox: true
+  show_landmarks: true
+  font_scale: 0.6
 ```
 
 ## Penjelasan Setiap Bagian
 
-### `project_name` & `version`
--   **`project_name`**: Nama proyek yang akan ditampilkan di jendela aplikasi.
--   **`version`**: Versi aplikasi.
+### `system`
+Pengaturan umum sistem.
+-   **`mode`**: Mode operasi ("attendance" atau "enrollment").
+-   **`gpu_enabled`**: Mengaktifkan akselerasi GPU (CUDA) jika tersedia.
+-   **`debug_mode`**: Mengaktifkan mode debug untuk log yang lebih detail.
+-   **`log_level`**: Tingkat logging (misal: "INFO", "DEBUG").
 
-### `stream_loader`
-Bagian ini mengontrol sumber input video.
--   **`source`**: Menentukan sumber video.
-    -   Gunakan `0` untuk webcam utama, `1` untuk webcam kedua, dan seterusnya.
-    -   Anda juga bisa memberikan path ke file video (misalnya, `"path/to/your/video.mp4"`).
--   **`resolution`**: Resolusi yang diinginkan untuk video (lebar, tinggi).
--   **`fps`**: Frame per second (FPS) yang diinginkan dari sumber video.
+### `input`
+Mengatur sumber video dan pemrosesan awal.
+-   **`source`**: Sumber video. Bisa berupa integer (0, 1) untuk webcam atau string URL RTSP untuk IP Camera.
+-   **`width`, `height`**: Resolusi target untuk stream.
+-   **`reconnect_delay`**: Waktu tunggu (detik) sebelum mencoba menghubungkan kembali jika stream terputus.
+-   **`preprocessing`**: Pengaturan untuk perbaikan kualitas gambar.
+    -   **`enable_clahe`**: Mengaktifkan Contrast Limited Adaptive Histogram Equalization untuk memperbaiki pencahayaan yang buruk.
 
-### `face_detection`
-Pengaturan untuk model deteksi wajah (YOLOv8).
--   **`model_path`**: Path ke file model deteksi wajah (`.pt`).
--   **`confidence_threshold`**: Ambang batas kepercayaan. Hanya deteksi dengan skor di atas nilai ini yang akan diproses. Nilai antara 0 dan 1.
+### `detection`
+Pengaturan untuk model deteksi wajah.
+-   **`model_name`**: Nama model yang digunakan (misal: "buffalo_l" untuk RetinaFace yang lebih akurat).
+-   **`confidence_threshold`**: Batas minimal kepercayaan deteksi.
+-   **`input_size`**: Ukuran input gambar untuk deteksi. Nilai lebih besar meningkatkan akurasi jarak jauh tapi menurunkan FPS.
 
-### `embedding_extractor`
-Pengaturan untuk model yang mengubah wajah menjadi representasi numerik (embedding).
--   **`model_path`**: Path ke file model ArcFace (`.onnx`).
--   **`input_size`**: Ukuran gambar wajah yang diharapkan oleh model (lebar, tinggi).
+### `liveness`
+Pengaturan deteksi keaslian wajah (anti-spoofing).
+-   **`enabled`**: Mengaktifkan atau menonaktifkan fitur liveness detection.
+-   **`model_path`**: Path ke model ONNX liveness (MiniFASNetV2).
+-   **`threshold`**: Batas skor untuk dianggap sebagai wajah asli.
 
-### `tracker`
-Mengonfigurasi algoritma pelacakan (SORT) untuk menjaga ID yang konsisten pada wajah yang terdeteksi.
--   **`max_age`**: Jumlah frame maksimum di mana sebuah track akan dipertahankan tanpa deteksi baru.
--   **`min_hits`**: Jumlah deteksi minimum yang diperlukan untuk memulai sebuah track.
--   **`iou_threshold`**: Ambang batas Intersection over Union (IoU) untuk mengasosiasikan deteksi dengan track yang ada.
+### `recognition`
+Pengaturan untuk pengenalan wajah.
+-   **`model_name`**: Paket model InsightFace yang digunakan.
+-   **`similarity_threshold`**: Batas kemiripan (cosine similarity) untuk mengenali wajah.
+-   **`min_face_size`**: Ukuran wajah minimum (piksel) untuk diproses pengenalan.
 
-### `attendance_manager`
-Mengelola logika inti untuk pengenalan wajah dan pencatatan absensi.
--   **`embeddings_path`**: Path ke file JSON yang menyimpan embedding wajah dari orang-orang yang terdaftar.
--   **`attendance_log_path`**: Path ke file CSV tempat catatan absensi akan disimpan.
--   **`recognition_threshold`**: Ambang batas kemiripan kosinus. Jika kemiripan antara wajah yang terdeteksi dan embedding yang tersimpan di atas nilai ini, wajah tersebut dianggap "dikenali".
--   **`unknown_threshold`**: Jika kemiripan tertinggi di bawah ambang batas ini, wajah akan ditandai sebagai "Tidak Dikenal".
--   **`consecutive_frames_for_recognition`**: Wajah harus dikenali secara konsisten selama jumlah frame ini sebelum absensi dicatat. Ini mencegah kesalahan pengenalan sesaat.
+### `tracking`
+Pengaturan pelacakan objek (wajah).
+-   **`algorithm`**: Algoritma tracking yang digunakan (saat ini "centroid").
+-   **`max_disappeared`**: Jumlah frame maksimum sebuah ID dipertahankan jika wajah tidak terdeteksi.
+-   **`distance_threshold`**: Jarak maksimum pergerakan wajah antar frame untuk dianggap sebagai orang yang sama.
 
-### `ui_system`
-Mengontrol aspek visual dari antarmuka pengguna.
--   **`font_path`**: Path ke file font (`.ttf`) yang akan digunakan untuk teks pada layar.
--   **`font_size`**: Ukuran font.
--   **`show_fps`**: Jika `true`, akan menampilkan FPS saat ini di layar.
--   **`theme`**: Pengaturan warna untuk berbagai elemen UI seperti latar belakang, teks, dan kotak pembatas (bounding box) untuk status yang berbeda (dikenali, tidak dikenali, sedang dilacak).
+### `attendance`
+Logika pencatatan absensi.
+-   **`cooldown_seconds`**: Jeda waktu sebelum orang yang sama bisa dicatat absensinya lagi.
+
+### `storage`
+Lokasi penyimpanan file data.
+-   **`embeddings_path`**: File JSON database wajah.
+-   **`logs_path`**: File CSV log absensi.
+-   **`snapshots_path`**: Folder untuk menyimpan foto wajah saat absensi (jika diaktifkan).
+
+### `ui`
+Pengaturan tampilan antarmuka.
+-   **`window_name`**: Judul jendela aplikasi.
+-   **`show_fps`**, **`show_bbox`**, **`show_landmarks`**: Toggle elemen visual.
+
