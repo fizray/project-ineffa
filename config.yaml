@@ -1,45 +1,52 @@
-camera_id: 0
-frame_width: 1280
-frame_height: 720
-grab_every_n_frames: 5
-detection_conf_threshold: 0.4
-min_face_size: 30
-max_faces: 3
-model_name: "vgg_face2"
-distance_metric: "cosine"
-embedding_dim: 512
-threshold_match: 0.62
-enrollment_threshold: 0.70
-liveness_window_size: 15
-liveness_blink_threshold: 0.4
-liveness_required: true
-embeddings_path: "embeddings.json"
-log_path: "attendance.csv"
-snapshot_dir: "snapshots"
-gallery_dir: "gallery"
-save_snapshot_threshold: 0.75
-auto_snapshot_unknown: true
-snapshot_quality: 85
-enable_gpu: true
-processing_batch_size: 1
-max_processing_time_ms: 1000
-ui_window_name: "Face Attendance PoC"
-ui_font_scale: 0.6
-ui_show_fps: true
-ui_show_detections: true
-ui_show_liveness: true
-attendance_cooldown: 30
-enable_encryption: false
-retention_days: 7
-audit_logging: true
-debug_mode: false
-save_intermediate: false
-log_level: "INFO"
-system_version: "1.0.0"
-poc_mode: true
-local_only: true
-# GPU Optimization settings
-gpu_memory_fraction: 0.8
-prefer_gpu: true
-optimize_for_gpu: true
-fast_preview: true
+system:
+  mode: "attendance" # Options: "attendance", "enrollment"
+  gpu_enabled: true
+  debug_mode: false
+  log_level: "INFO"
+
+input:
+  # Source configuration
+  # For Webcam: use integer (e.g., 0, 1)
+  # For RTSP: use string (e.g., "rtsp://admin:pass@192.168.1.10:554/stream")
+  source: 0 
+  # source: "rtsp://admin:password@192.168.1.100:554/cam1"
+  
+  width: 1280
+  height: 720
+  fps_limit: 30
+  reconnect_delay: 5 # Seconds to wait before reconnecting RTSP
+
+detection:
+  # Options: "yolov8n-face", "buffalo_l" (RetinaFace), "buffalo_s"
+  model_name: "buffalo_l" 
+  confidence_threshold: 0.5
+  nms_threshold: 0.4
+  input_size: 640 # Resize input for detection (640 is standard for YOLO/Retina)
+
+recognition:
+  model_name: "buffalo_l" # InsightFace model pack (contains ArcFace)
+  similarity_threshold: 0.60 # Threshold for match (Cosine Similarity)
+  min_face_size: 64 # Minimum pixel height/width to attempt recognition
+  
+tracking:
+  enabled: true
+  algorithm: "centroid" # Options: "centroid", "bytetrack" (future)
+  max_disappeared: 30 # Frames to keep ID alive without detection
+  distance_threshold: 50 # Pixel distance for centroid matching
+
+attendance:
+  cooldown_seconds: 30 # Ignore same person for X seconds after logging
+  quality_threshold: 0.0 # Minimum face quality score (if available) to process
+  
+storage:
+  embeddings_path: "embeddings.json"
+  logs_path: "attendance.csv"
+  snapshots_path: "snapshots/"
+  gallery_path: "gallery/"
+
+ui:
+  window_name: "Face Attendance System (Rebuild)"
+  show_fps: true
+  show_bbox: true
+  show_landmarks: true
+  font_scale: 0.6

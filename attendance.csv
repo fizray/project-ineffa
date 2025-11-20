@@ -40,3 +40,5 @@ timestamp_iso,user_id,user_name,matched_score,liveness_passed,snapshot_path,note
 2025-11-12T09:22:22.188391,user_001,Hafiz,0.912,True,snapshots\snap_user_001_2025-11-12_09-22-22.188391.jpg,auto,True,1.000,107.1
 2025-11-12T09:22:57.576930,user_001,Hafiz,0.908,True,snapshots\snap_user_001_2025-11-12_09-22-57.576930.jpg,auto,True,1.000,108.9
 2025-11-12T09:23:33.845685,user_001,Hafiz,0.904,True,snapshots\snap_user_001_2025-11-12_09-23-33.845685.jpg,auto,True,1.000,115.5
+2025-11-20 08:56:57,Budi
+2025-11-20 09:01:28,Budi
