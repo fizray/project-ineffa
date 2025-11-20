@@ -8,7 +8,7 @@ input:
   # Source configuration
   # For Webcam: use integer (e.g., 0, 1)
   # For RTSP: use string (e.g., "rtsp://admin:pass@192.168.1.10:554/stream")
-  source: "test.mp4"
+  source: 0
   # source: "rtsp://admin:password@192.168.1.100:554/cam1"
   
   width: 1920
