@@ -1,10 +1,26 @@
+import sys
+import os
+
+# Pre-flight Check: Ensure NumPy < 2.0.0 for OpenCV compatibility
+try:
+    import numpy as np
+    if np.__version__.startswith('2.'):
+        print("\n" + "!"*60)
+        print(f" [CRITICAL] Incompatible NumPy version detected: {np.__version__}")
+        print(" OpenCV requires NumPy 1.x to function correctly.")
+        print("!"*60)
+        print(" FIX: Run 'pip install \"numpy<2.0.0\"' to downgrade.")
+        print("!"*60 + "\n")
+        sys.exit(1)
+except ImportError:
+    pass
+
 import cv2
 import yaml
 import time
 import logging
-import numpy as np
+# import numpy as np # Already imported above
 import json
-import os
 from datetime import datetime
 
 from core.stream_loader import RTSPStreamLoader

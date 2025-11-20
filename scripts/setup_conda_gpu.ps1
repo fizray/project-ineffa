@@ -64,6 +64,10 @@ Write-Host "`n[3/4] Installing Python dependencies..." -ForegroundColor Yellow
 # We use 'conda run' to execute pip inside the environment without activating it in the shell
 # This is more robust for scripts.
 try {
+    # Pre-install numpy<2 to prevent conflicts with OpenCV
+    Write-Host "  - Enforcing NumPy < 2.0.0..." -ForegroundColor Gray
+    conda run -n $envName pip install "numpy<2.0.0"
+
     conda run -n $envName pip install -r requirements.txt
     
     # Explicitly reinstall onnxruntime-gpu to ensure we have the GPU version
