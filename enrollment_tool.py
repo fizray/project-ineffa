@@ -8,8 +8,8 @@ import argparse
 from datetime import datetime
 from insightface.app import FaceAnalysis
 
-from face_detection import FaceDetector
-from embedding_extractor import RecognitionEngine
+from core.face_detection import FaceDetector
+from core.embedding_extractor import RecognitionEngine
 
 # Setup Logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')

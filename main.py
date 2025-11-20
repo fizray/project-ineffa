@@ -7,12 +7,13 @@ import json
 import os
 from datetime import datetime
 
-from stream_loader import RTSPStreamLoader
-from face_detection import FaceDetector
-from embedding_extractor import RecognitionEngine
-from tracker import CentroidTracker
-from ui_system import UISystem
+from core.stream_loader import RTSPStreamLoader
+from core.face_detection import FaceDetector
+from core.embedding_extractor import RecognitionEngine
+from core.tracker import CentroidTracker
+from core.ui_system import UISystem
 from insightface.app import FaceAnalysis
+from numpy.linalg import norm
 
 # Setup Logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -58,7 +59,8 @@ class AttendanceSystem:
         )
 
         # State
-        self.known_embeddings = [] # List of {'name': str, 'embedding': np.array}
+        self.known_face_encodings = [] # Matrix (N, 512)
+        self.known_face_names = []     # List of N names
         self.attendance_log = {} # {name: last_seen_timestamp}
         self.recent_logs = [] # List of {'name': str, 'time': str} for UI
         self.tracked_faces_state = {} # {object_id: {'name': str, 'processed': bool, 'best_score': float}}
@@ -76,36 +78,51 @@ class AttendanceSystem:
                 with open(path, 'r') as f:
                     data = json.load(f)
                 
-                self.known_embeddings = []
+                encodings = []
+                names = []
+                
                 for user_id, user_data in data.items():
                     name = user_data.get('name', 'Unknown')
                     embeddings = user_data.get('embeddings', [])
                     for embed in embeddings:
-                        self.known_embeddings.append({
-                            'name': name,
-                            'embedding': np.array(embed, dtype=np.float32)
-                        })
+                        # Normalize embedding on load
+                        emb_array = np.array(embed, dtype=np.float32)
+                        norm_val = norm(emb_array)
+                        if norm_val > 0:
+                            emb_array = emb_array / norm_val
+                            
+                        encodings.append(emb_array)
+                        names.append(name)
+                
+                self.known_face_encodings = np.array(encodings)
+                self.known_face_names = names
                         
-                logger.info(f"Loaded {len(self.known_embeddings)} embeddings from {len(data)} users.")
+                logger.info(f"Loaded {len(self.known_face_encodings)} embeddings from {len(data)} users.")
             except Exception as e:
                 logger.error(f"Failed to load embeddings: {e}")
         else:
             logger.warning("No embeddings file found. Starting empty.")
 
     def _identify_face(self, embedding):
-        best_name = "Unknown"
-        best_score = 0.0
+        if len(self.known_face_encodings) == 0:
+            return "Unknown", 0.0
+            
+        # Normalize query embedding
+        norm_val = norm(embedding)
+        if norm_val > 0:
+            embedding = embedding / norm_val
+            
+        # Vectorized Cosine Similarity
+        # (N, 512) dot (512,) -> (N,)
+        similarities = np.dot(self.known_face_encodings, embedding)
         
-        for entry in self.known_embeddings:
-            known_embed = entry['embedding']
-            score = self.recognizer.compute_similarity(embedding, known_embed)
-            if score > best_score:
-                best_score = score
-                best_name = entry['name']
+        best_idx = np.argmax(similarities)
+        best_score = similarities[best_idx]
         
         if best_score >= self.config['recognition']['similarity_threshold']:
-            return best_name, best_score
-        return "Unknown", best_score
+            return self.known_face_names[best_idx], float(best_score)
+            
+        return "Unknown", float(best_score)
 
     def _log_attendance(self, name):
         now = time.time()

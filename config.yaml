@@ -39,8 +39,8 @@ attendance:
   quality_threshold: 0.0 # Minimum face quality score (if available) to process
   
 storage:
-  embeddings_path: "embeddings.json"
-  logs_path: "attendance.csv"
+  embeddings_path: "data/embeddings.json"
+  logs_path: "data/attendance.csv"
   snapshots_path: "snapshots/"
   gallery_path: "gallery/"
 
