@@ -20,7 +20,8 @@ Buka terminal dan jalankan perintah berikut:
 sudo apt update && sudo apt upgrade -y
 
 # Instal dependensi dasar yang sering dibutuhkan oleh OpenCV dan Python
-sudo apt install -y build-essential libgl1-mesa-glx libglib2.0-0 git wget
+# Catatan: Pada Ubuntu versi baru (22.04+), libgl1-mesa-glx digantikan oleh libgl1
+sudo apt install -y build-essential libgl1 libglib2.0-0 git wget
 ```
 
 ---
@@ -105,7 +106,13 @@ Untuk memastikan semuanya berjalan lancar, Anda bisa menjalankan skrip verifikas
     Jika tidak ada error, berarti instalasi berhasil.
 
 2.  **Cek Model**:
-    Aplikasi akan otomatis mengunduh model InsightFace (`buffalo_l`) saat pertama kali dijalankan. Pastikan Anda memiliki koneksi internet.
+    Jalankan skrip berikut untuk mengunduh model yang diperlukan (InsightFace & Liveness) secara otomatis:
+    ```bash
+    python scripts/setup_models.py
+    ```
+    Skrip ini akan:
+    - Mengunduh model `buffalo_l` ke `~/.insightface/models/`.
+    - Mengunduh model liveness `2.7_80x80_MiniFASNetV2.onnx` ke folder `models/` di proyek.
 
 ---
 
@@ -172,7 +179,7 @@ Jika aplikasi terasa lambat di CPU, Anda bisa melakukan beberapa penyesuaian di 
 -   **Error `libGL.so.1: cannot open shared object file`**:
     Ini berarti library OpenGL belum terinstal. Jalankan:
     ```bash
-    sudo apt install libgl1-mesa-glx
+    sudo apt install libgl1
     ```
 
 -   **Error `libgthread-2.0.so.0`**:
