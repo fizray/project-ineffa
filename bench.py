@@ -34,7 +34,8 @@ SETTINGS = {
     "threads": 4,
     "batch_size": 1,
     "mode": "Custom", # Detection, Recognition, Liveness, Custom
-    "config": {}
+    "config": {},
+    "provider": "CPU" # CPU, GPU
 }
 
 def load_config():
@@ -73,13 +74,18 @@ def clear_screen():
 
 def print_header():
     print("\033[96m==================================================\033[0m")
-    print("\033[1m          CPU BENCHMARK TOOL (TUI)               \033[0m")
+    print("\033[1m          BENCHMARK TOOL (CPU/GPU)               \033[0m")
     print("\033[96m==================================================\033[0m")
+
+def get_providers():
+    if SETTINGS["provider"] == "GPU":
+        return ["CUDAExecutionProvider", "CPUExecutionProvider"]
+    return ["CPUExecutionProvider"]
 
 def get_model_input_shape(model_path):
     try:
         # Create a dummy session just to get input shape
-        sess = ort.InferenceSession(model_path, providers=["CPUExecutionProvider"])
+        sess = ort.InferenceSession(model_path, providers=get_providers())
         inp = sess.get_inputs()[0]
         return inp.shape
     except Exception as e:
@@ -95,6 +101,7 @@ def run_benchmark():
 
     print(f"\n\033[93m[INFO] Initializing Benchmark...\033[0m")
     print(f"  Model: {model_path}")
+    print(f"  Provider: {SETTINGS['provider']}")
     print(f"  Threads: {SETTINGS['threads']}")
     
     # Set Environment Variables for Threads
@@ -106,7 +113,7 @@ def run_benchmark():
         so.inter_op_num_threads = 1
         so.graph_optimization_level = ort.GraphOptimizationLevel.ORT_ENABLE_ALL
         
-        sess = ort.InferenceSession(model_path, sess_options=so, providers=["CPUExecutionProvider"])
+        sess = ort.InferenceSession(model_path, sess_options=so, providers=get_providers())
     except Exception as e:
         print(f"\033[91mFailed to load model: {e}\033[0m")
         input("Press Enter to continue...")
@@ -299,6 +306,27 @@ def change_batch_size():
     except ValueError:
         pass
 
+def change_provider():
+    print(f"\nCurrent Provider: {SETTINGS['provider']}")
+    print("Available Providers:")
+    available = ort.get_available_providers()
+    for p in available:
+        print(f"  - {p}")
+        
+    print("\nSelect Provider:")
+    print("  1. CPU")
+    print("  2. GPU (CUDA)")
+    
+    choice = input("Select option (1-2): ").strip()
+    if choice == '1':
+        SETTINGS["provider"] = "CPU"
+    elif choice == '2':
+        if "CUDAExecutionProvider" in available:
+            SETTINGS["provider"] = "GPU"
+        else:
+            print("\033[91mCUDA Provider not available!\033[0m")
+            time.sleep(1)
+
 def change_mode():
     print("\nSelect Benchmark Mode:")
     print("  1. Detection (from config)")
@@ -341,6 +369,7 @@ def main():
         inp_str = SETTINGS['input_dir'] if SETTINGS['input_dir'] else "Synthetic (Random Noise)"
         print(f"  [I] Input    : {inp_str}")
         print(f"  [B] Batch    : \033[93m{SETTINGS['batch_size']}\033[0m")
+        print(f"  [P] Provider : \033[95m{SETTINGS['provider']}\033[0m")
         print(f"  [T] Threads  : \033[93m{SETTINGS['threads']}\033[0m")
         print(f"  [R] Runs     : {SETTINGS['runs']} (Warmup: {SETTINGS['warmup']})")
         print("-" * 50)
@@ -352,6 +381,7 @@ def main():
         print("5. Set Threads")
         print("6. Set Batch Size")
         print("7. Set Runs & Warmup")
+        print("8. Change Provider (CPU/GPU)")
         print("0. Exit")
         print("=" * 50)
         
@@ -372,6 +402,8 @@ def main():
             change_batch_size()
         elif choice == '7':
             change_runs()
+        elif choice == '8':
+            change_provider()
         elif choice == '0':
             print("\nGoodbye!")
             sys.exit(0)
