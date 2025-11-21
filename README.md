@@ -145,3 +145,4 @@ Untuk pemahaman yang lebih mendalam tentang cara kerja setiap komponen, silakan 
 -   [`docs/configuration.md`](./docs/configuration.md): Penjelasan lengkap file `config.yaml`.
 -   [`docs/core_modules.md`](./docs/core_modules.md): Detail tentang modul-modul di direktori `core/`.
 -   [`docs/scripts_and_tools.md`](./docs/scripts_and_tools.md): Penjelasan skrip bantu seperti `enrollment_tool.py`.
+-   [`docs/setup_linux_cpu.md`](./docs/setup_linux_cpu.md): Panduan instalasi untuk Linux (Debian/Ubuntu) dengan CPU.
