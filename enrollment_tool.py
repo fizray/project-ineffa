@@ -19,11 +19,13 @@ class EnrollmentSystem:
     def __init__(self, config_path="config.yaml"):
         self.config = self._load_config(config_path)
         self.embeddings_path = self.config['storage']['embeddings_path']
-        
+
         # Initialize InsightFace
-        providers = ['CUDAExecutionProvider', 'CPUExecutionProvider'] if self.config['system']['gpu_enabled'] else ['CPUExecutionProvider']
+        runtime_mode = os.environ.get("INEFFA_RUNTIME_MODE", "").lower()
+        use_gpu = self.config['system']['gpu_enabled'] and runtime_mode != "cpu"
+        providers = ['CUDAExecutionProvider', 'CPUExecutionProvider'] if use_gpu else ['CPUExecutionProvider']
         logger.info(f"Initializing InsightFace with providers: {providers}")
-        
+
         self.insightface_app = FaceAnalysis(
             name=self.config['detection']['model_name'], 
             allowed_modules=['detection', 'recognition'], 
@@ -62,6 +64,10 @@ class EnrollmentSystem:
 
     def _save_embeddings(self):
         try:
+            embeddings_dir = os.path.dirname(self.embeddings_path)
+            if embeddings_dir:
+                os.makedirs(embeddings_dir, exist_ok=True)
+
             # Convert numpy arrays to lists for JSON serialization if needed
             # But we store them as lists in memory for this tool to be safe
             with open(self.embeddings_path, 'w') as f:

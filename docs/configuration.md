@@ -17,8 +17,8 @@ input:
   # Untuk RTSP: gunakan string (misal: "rtsp://admin:pass@192.168.1.10:554/stream")
   source: 0
   
-  width: 1920
-  height: 1080
+  width: 1280
+  height: 720
   fps_limit: 60
   reconnect_delay: 5 # Detik menunggu sebelum mencoba koneksi ulang RTSP
   
@@ -63,6 +63,8 @@ storage:
 
 ui:
   window_name: "Face Attendance System (Rebuild)"
+  display_width: 960
+  display_height: 540
   show_fps: true
   show_bbox: true
   show_landmarks: true
@@ -123,5 +125,6 @@ Lokasi penyimpanan file data.
 ### `ui`
 Pengaturan tampilan antarmuka.
 -   **`window_name`**: Judul jendela aplikasi.
+-   **`display_width`, `display_height`**: Ukuran maksimum jendela tampilan. Frame kamera di-resize untuk display agar panel UI tetap terlihat penuh.
 -   **`show_fps`**, **`show_bbox`**, **`show_landmarks`**: Toggle elemen visual.
 

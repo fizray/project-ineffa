@@ -385,7 +385,11 @@ def main():
         print("0. Exit")
         print("=" * 50)
         
-        choice = input("Select option: ").strip()
+        try:
+            choice = input("Select option: ").strip()
+        except EOFError:
+            print("\nNo input available. Exiting benchmark.")
+            sys.exit(0)
         
         if choice == '1':
             run_benchmark()

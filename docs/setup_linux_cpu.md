@@ -1,6 +1,6 @@
 # Panduan Setup Project Ineffa di Linux (Debian/Ubuntu) dengan CPU
 
-Dokumen ini menjelaskan langkah-langkah untuk menyiapkan dan menjalankan **Project Ineffa** pada sistem operasi berbasis Debian atau Ubuntu menggunakan **Miniconda** dan **CPU**.
+Dokumen ini menjelaskan langkah-langkah untuk menyiapkan dan menjalankan **Project Ineffa** pada sistem operasi berbasis Debian atau Ubuntu menggunakan **uv** dan **CPU**.
 
 Panduan ini cocok untuk:
 - Server tanpa GPU.
@@ -26,31 +26,13 @@ sudo apt install -y build-essential libgl1 libglib2.0-0 git wget
 
 ---
 
-## 2. Instalasi Miniconda
+## 2. Instalasi uv
 
-Jika Anda belum memiliki Conda, instal Miniconda terlebih dahulu. Miniconda adalah versi minimal dari Anaconda yang ringan.
+Install `uv` terlebih dahulu:
 
-1.  **Unduh Installer Miniconda**:
-    ```bash
-    mkdir -p ~/miniconda3
-    wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh -O ~/miniconda3/miniconda.sh
-    ```
-
-2.  **Jalankan Installer**:
-    ```bash
-    bash ~/miniconda3/miniconda.sh -b -u -p ~/miniconda3
-    ```
-
-3.  **Inisialisasi Conda**:
-    ```bash
-    ~/miniconda3/bin/conda init bash
-    ```
-
-4.  **Muat Ulang Shell**:
-    Tutup terminal dan buka kembali, atau jalankan:
-    ```bash
-    source ~/.bashrc
-    ```
+```bash
+python3 -m pip install --user uv
+```
 
 ---
 
@@ -64,34 +46,21 @@ Sekarang kita akan membuat environment khusus untuk proyek ini agar tidak mengga
     cd project-ineffa
     ```
 
-2.  **Buat Environment Conda**:
-    Kita akan menggunakan Python 3.10 yang stabil.
+2.  **Buat Virtual Environment**:
     ```bash
-    conda create -n ineffa-cpu python=3.10 -y
+    python3 -m venv .venv
     ```
 
 3.  **Aktifkan Environment**:
     ```bash
-    conda activate ineffa-cpu
+    source .venv/bin/activate
     ```
 
 4.  **Instal Dependensi**:
-    Karena kita menggunakan CPU, kita perlu menyesuaikan beberapa paket dari `requirements.txt` (terutama `onnxruntime-gpu` menjadi `onnxruntime`).
-
-    Jalankan perintah berikut untuk menginstal paket-paket utama secara manual agar lebih aman:
-
     ```bash
-    # Instal paket dasar
-    pip install numpy opencv-python pyyaml tqdm requests pillow scikit-learn filterpy lap
-
-    # Instal InsightFace (untuk pengenalan wajah)
-    pip install insightface
-
-    # Instal ONNX Runtime versi CPU
-    pip install onnxruntime
+    python -m pip install --upgrade pip uv
+    python -m uv pip install --python .venv/bin/python -r requirements-cpu.txt
     ```
-
-    *Catatan: Jika Anda melihat error terkait `onnxruntime-gpu` saat mencoba menginstal dari requirements.txt, abaikan saja dan pastikan `onnxruntime` (versi CPU) sudah terinstal.*
 
 ---
 
@@ -129,10 +98,6 @@ Pilih opsi **1. Run Benchmark** di menu.
 ### Mode Absensi (Utama)
 Untuk menjalankan sistem absensi utama:
 
-```bash
-python launch.py
-```
-Atau langsung ke skrip utama:
 ```bash
 python main.py
 ```

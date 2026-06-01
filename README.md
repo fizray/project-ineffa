@@ -14,8 +14,6 @@
   - [Instalasi (CPU)](#instalasi-cpu)
   - [Instalasi (GPU - Opsional)](#instalasi-gpu---opsional)
 - [Cara Penggunaan](#cara-penggunaan)
-  - [1. Mendaftarkan Wajah Baru](#1-mendaftarkan-wajah-baru)
-  - [2. Menjalankan Aplikasi Absensi](#2-menjalankan-aplikasi-absensi)
 - [Konfigurasi](#konfigurasi)
 - [Dokumentasi Teknis](#dokumentasi-teknis)
 
@@ -49,14 +47,18 @@ Sistem ini terdiri dari beberapa modul inti yang bekerja sama:
 
 ### Prasyarat
 
--   Python 3.8 atau lebih tinggi.
--   Conda (dianjurkan untuk manajemen environment).
 -   Git.
--   **Untuk GPU**: Driver NVIDIA dan CUDA Toolkit yang kompatibel.
+-   **CPU**: Python 3.10 atau lebih tinggi.
+-   **GPU NVIDIA**: Miniconda/Anaconda dan driver NVIDIA yang kompatibel.
 
-### Instalasi (CPU)
+Setup proyek memakai mode hybrid:
 
-Cara termudah untuk menginstal adalah dengan menggunakan skrip yang disediakan.
+-   **CPU**: `.venv` lokal + `uv` untuk dependensi Python.
+-   **GPU**: Conda untuk CUDA/cuDNN native, lalu `uv` untuk dependensi Python.
+
+### Launcher All-in-One
+
+Cara termudah adalah memakai satu launcher root:
 
 1.  **Clone Repositori**
     ```bash
@@ -64,65 +66,68 @@ Cara termudah untuk menginstal adalah dengan menggunakan skrip yang disediakan.
     cd project-ineffa
     ```
 
-2.  **Jalankan Skrip Setup Conda**
-    Buka Command Prompt atau PowerShell, lalu jalankan:
-    ```bash
-    setup_conda.bat
+2.  **Buka Launcher**
+    Jalankan salah satu:
+    ```bat
+    ineffa.bat
     ```
-    Skrip ini akan secara otomatis:
-    -   Membuat environment Conda baru bernama `ineffa-env`.
-    -   Mengaktifkan environment tersebut.
-    -   Menginstal semua pustaka Python yang diperlukan dari `requirements.txt`.
+    ```powershell
+    powershell -ExecutionPolicy Bypass -File .\ineffa.ps1
+    ```
 
-3.  **Unduh Model**
-    Pastikan Anda memiliki model yang diperlukan di dalam direktori `models/`:
-    -   `yolov8n-face.pt` (untuk deteksi wajah)
-    -   `mobile_net_v2_arcface.onnx` (untuk ekstraksi embedding)
-    *Catatan: Tautan untuk mengunduh model dapat ditemukan di dokumentasi atau repositori aslinya.*
+    Menu ini menangani setup, launch absensi, enrollment, benchmark, setup model, verifikasi environment, cek kamera, dan clear log.
+
+3.  **Setup dari Menu**
+    Pilih:
+    -   `1. Setup auto` untuk deteksi CPU/GPU otomatis.
+    -   `2. Setup CPU` untuk `.venv` + `uv`.
+    -   `3. Setup GPU` untuk Conda CUDA/cuDNN + `uv`.
+
+    Jika hanya ingin menjalankan setup langsung tanpa menu:
+    ```powershell
+    powershell -ExecutionPolicy Bypass -File .\setup_ineffa.ps1
+    ```
+    Skrip setup akan mendeteksi GPU NVIDIA. Jika GPU tersedia, setup memakai Conda + CUDA/cuDNN + `uv`. Jika tidak, setup memakai `.venv` CPU + `uv`.
+
+    Mode juga bisa dipilih manual:
+    ```powershell
+    .\setup_ineffa.ps1 -Mode cpu
+    .\setup_ineffa.ps1 -Mode gpu
+    ```
+
+    Opsi tambahan:
+    ```powershell
+    .\setup_ineffa.ps1 -Mode gpu -EnvName ineffa-gpu
+    .\setup_ineffa.ps1 -Mode cpu -SkipModels
+    .\setup_ineffa.ps1 -Mode gpu -RunApp
+    ```
+
+4.  **Model**
+    Secara default, setup menjalankan `python scripts/setup_models.py` untuk mengunduh/mengecek model yang dibutuhkan. Di launcher, model juga bisa dicek lewat menu `7. Setup/check models`.
 
 ### Instalasi (GPU - Opsional)
 
-Untuk performa yang jauh lebih baik, Anda dapat menggunakan GPU NVIDIA.
+Untuk performa yang jauh lebih baik, gunakan mode GPU:
 
-1.  **Pastikan Driver dan CUDA Terinstal**: Ikuti panduan resmi NVIDIA untuk menginstal driver kartu grafis Anda dan CUDA Toolkit yang sesuai.
-2.  **Jalankan Skrip Setup GPU**: Gunakan skrip PowerShell yang dirancang untuk ini. Buka PowerShell sebagai Administrator, lalu jalankan:
-    ```powershell
-    # Izinkan eksekusi skrip (jika belum)
-    Set-ExecutionPolicy Unrestricted -Force
+```powershell
+.\setup_ineffa.ps1 -Mode gpu
+```
 
-    # Jalankan skrip setup GPU
-    .\scripts\setup_conda_gpu.ps1
-    ```
-    Skrip ini akan menginstal PyTorch versi GPU dan dependensi CUDA lainnya di dalam environment Conda.
+Mode ini membuat environment Conda `ineffa-gpu`, memasang `cudatoolkit=11.8`, `cudnn=8.9.2`, dan `zlib-wapi`, lalu memasang dependency Python dari `requirements-gpu.txt` memakai `uv`. `onnxruntime-gpu==1.16.3` tetap dipin untuk kompatibilitas CUDA 11.8.
 
 ---
 
 ## Cara Penggunaan
 
-### 1. Mendaftarkan Wajah Baru
+Jalankan `ineffa.bat`, lalu pilih menu:
 
-Sebelum sistem dapat mengenali siapa pun, Anda harus mendaftarkan wajah mereka terlebih dahulu.
+-   `4. Attendance` untuk menjalankan aplikasi absensi.
+-   `5. Enroll user` untuk mendaftarkan wajah baru.
+-   `6. Benchmark` untuk menjalankan benchmark.
+-   `8. Verify environment` untuk cek dependency dan ONNX provider.
+-   `9. Check cameras` untuk cek kamera yang terdeteksi.
 
--   Aktifkan environment Conda Anda:
-    ```bash
-    conda activate ineffa-env
-    ```
--   Jalankan alat pendaftaran:
-    ```bash
-    python enrollment_tool.py
-    ```
--   Masukkan nama orang yang akan didaftarkan, lalu posisikan wajah di depan kamera. Sistem akan secara otomatis mengambil beberapa sampel dan menyimpannya.
-
-### 2. Menjalankan Aplikasi Absensi
-
-Setelah wajah terdaftar, Anda siap menjalankan aplikasi utama.
-
--   Pastikan environment Conda aktif.
--   Jalankan aplikasi melalui skrip `launch.py`:
-    ```bash
-    python launch.py
-    ```
--   Aplikasi akan membuka jendela yang menampilkan feed kamera. Ketika wajah yang terdaftar terdeteksi, namanya akan muncul, dan absensi akan dicatat.
+Launcher menjalankan Python environment secara langsung. Untuk GPU, launcher memakai `python.exe` dari Conda env `ineffa-gpu`, bukan `conda run`, sehingga menu interaktif tidak terkena `EOFError`.
 
 ---
 

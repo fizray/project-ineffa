@@ -32,9 +32,11 @@ def setup_insightface_models():
     print("\nChecking/Downloading InsightFace models (buffalo_l)...")
     try:
         import insightface
+        runtime_mode = os.environ.get("INEFFA_RUNTIME_MODE", "").lower()
+        providers = ['CPUExecutionProvider'] if runtime_mode == "cpu" else ['CUDAExecutionProvider', 'CPUExecutionProvider']
         # Initializing FaceAnalysis triggers the download if not present
-        app = insightface.app.FaceAnalysis(name='buffalo_l', root='~/.insightface')
-        app.prepare(ctx_id=-1) # ctx_id=-1 means CPU
+        app = insightface.app.FaceAnalysis(name='buffalo_l', root='~/.insightface', providers=providers)
+        app.prepare(ctx_id=0 if runtime_mode == "gpu" else -1)
         print("InsightFace 'buffalo_l' models are ready.")
     except ImportError:
         print("Error: 'insightface' library not installed. Run 'pip install insightface'")

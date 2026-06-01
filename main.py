@@ -74,7 +74,8 @@ class AttendanceSystem:
         self.known_face_encodings = [] # Matrix (N, 512)
         self.known_face_names = []     # List of N names
         self.tracked_faces_state = {} # {object_id: {'name': str, 'processed': bool, 'best_score': float}}
-        
+        self.window_ready = False
+
         self._load_embeddings()
 
     def _load_config(self, path):
@@ -83,9 +84,11 @@ class AttendanceSystem:
 
     def _init_insightface(self):
         # Initialize Shared InsightFace App
-        providers = ['CUDAExecutionProvider', 'CPUExecutionProvider'] if self.config['system']['gpu_enabled'] else ['CPUExecutionProvider']
+        runtime_mode = os.environ.get("INEFFA_RUNTIME_MODE", "").lower()
+        use_gpu = self.config['system']['gpu_enabled'] and runtime_mode != "cpu"
+        providers = ['CUDAExecutionProvider', 'CPUExecutionProvider'] if use_gpu else ['CPUExecutionProvider']
         logger.info(f"Initializing InsightFace with providers: {providers}")
-        
+
         self.insightface_app = FaceAnalysis(
             name=self.config['detection']['model_name'], 
             allowed_modules=['detection', 'recognition'], 
@@ -149,6 +152,7 @@ class AttendanceSystem:
 
     def run(self):
         self.stream.start()
+        self._prepare_window()
         logger.info("System Started. Press 'q' to exit.")
         
         try:
@@ -168,6 +172,29 @@ class AttendanceSystem:
             self.stream.stop()
             cv2.destroyAllWindows()
             logger.info("System Stopped.")
+
+    def _prepare_window(self):
+        window_name = self.config['ui']['window_name']
+        display_width = int(self.config['ui'].get('display_width', 960))
+        display_height = int(self.config['ui'].get('display_height', 540))
+
+        cv2.namedWindow(window_name, cv2.WINDOW_NORMAL)
+        cv2.resizeWindow(window_name, display_width, display_height)
+        self.window_ready = True
+
+    def _resize_for_display(self, frame):
+        display_width = int(self.config['ui'].get('display_width', 960))
+        display_height = int(self.config['ui'].get('display_height', 540))
+        if display_width <= 0 or display_height <= 0:
+            return frame
+
+        h, w = frame.shape[:2]
+        scale = min(display_width / w, display_height / h, 1.0)
+        if scale >= 1.0:
+            return frame
+
+        new_size = (int(w * scale), int(h * scale))
+        return cv2.resize(frame, new_size, interpolation=cv2.INTER_AREA)
 
     def _process_frame(self, frame):
         # 0. Preprocessing (CLAHE)
@@ -209,12 +236,15 @@ class AttendanceSystem:
         frame_display = frame_processed if self.config['input'].get('preprocessing', {}).get('enable_clahe', False) else frame
         
         frame_final = self.ui.draw_dashboard(
-            frame_display, 
-            self.tracked_faces_state, 
-            faces_map, 
-            self.attendance_manager.get_recent_logs(), 
+            frame_display,
+            self.tracked_faces_state,
+            faces_map,
+            self.attendance_manager.get_recent_logs(),
             is_connected=True
         )
+        frame_final = self._resize_for_display(frame_final)
+        if not self.window_ready:
+            self._prepare_window()
         cv2.imshow(self.config['ui']['window_name'], frame_final)
 
     def _map_faces_to_tracker(self, objects, faces):

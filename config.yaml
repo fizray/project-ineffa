@@ -10,12 +10,12 @@ input:
   # For RTSP: use string (e.g., "rtsp://admin:pass@192.168.1.10:554/stream")
   source: 0
   # source: "rtsp://admin:password@192.168.1.100:554/cam1"
-  
-  width: 1920
-  height: 1080
+
+  width: 1280
+  height: 720
   fps_limit: 60
   reconnect_delay: 5 # Seconds to wait before reconnecting RTSP
-  
+
   # Image Preprocessing for CCTV/Bad Lighting
   preprocessing:
     enable_clahe: true # Improves contrast in shadows/glare
@@ -24,13 +24,13 @@ input:
 
 detection:
   # Options: "yolov8n-face", "buffalo_l" (RetinaFace), "buffalo_s"
-  model_name: "buffalo_l" 
+  model_name: "buffalo_l"
   confidence_threshold: 0.4 # Lowered for CCTV to catch harder faces
   nms_threshold: 0.4
   input_size: 1280 # For CCTV, increase to 1280 or -1 (original size). Warning: Lowers FPS!
 
 liveness:
-  enabled: false 
+  enabled: false
   model_path: "models/2.7_80x80_MiniFASNetV2.onnx"
   threshold: 0.7
 
@@ -38,7 +38,7 @@ recognition:
   model_name: "buffalo_l" # InsightFace model pack (contains ArcFace)
   similarity_threshold: 0.55 # Slightly lower for CCTV (faces are blurrier)
   min_face_size: 40 # Lowered to detect faces further away
-  
+
 tracking:
   enabled: true
   algorithm: "centroid" # Options: "centroid", "bytetrack" (future)
@@ -48,7 +48,7 @@ tracking:
 attendance:
   cooldown_seconds: 30 # Ignore same person for X seconds after logging
   quality_threshold: 0.0 # Minimum face quality score (if available) to process
-  
+
 storage:
   embeddings_path: "data/embeddings.json"
   logs_path: "data/attendance.csv"
@@ -57,6 +57,8 @@ storage:
 
 ui:
   window_name: "Face Attendance System (Rebuild)"
+  display_width: 960
+  display_height: 540
   show_fps: true
   show_bbox: true
   show_landmarks: true

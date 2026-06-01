@@ -247,7 +247,11 @@ def main():
         print("0. Exit")
         print("\033[96m==================================================\033[0m")
         
-        choice = input("Select option: ").strip()
+        try:
+            choice = input("Select option: ").strip()
+        except EOFError:
+            print("\nNo input available. Exiting launcher.")
+            sys.exit(0)
         
         if choice == '1':
             run_attendance()

@@ -1,0 +1,10 @@
+-r requirements.txt
+
+# GPU runtime pinned for CUDA 11.8 compatibility
+onnxruntime-gpu==1.16.3
+
+# insightface dependencies installed explicitly because insightface depends on
+# CPU onnxruntime. setup_ineffa.ps1 installs insightface itself with --no-deps.
+onnx>=1.14.0
+scikit-image>=0.21.0
+scipy>=1.10.0

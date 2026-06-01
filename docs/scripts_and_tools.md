@@ -50,25 +50,37 @@ python enrollment_tool.py --id "1001" --name "Budi Santoso" --samples 5
 
 ---
 
-### 3. `launch.py`
+### 3. `ineffa.bat` / `ineffa.ps1`
 
-**Tujuan:** Skrip sederhana untuk meluncurkan `main.py`.
+**Tujuan:** Launcher all-in-one untuk setup dan menjalankan workflow utama.
 
 **Cara Menggunakan:**
-```bash
-python launch.py
+```bat
+ineffa.bat
 ```
+
+Menu launcher mencakup:
+-   Setup auto/CPU/GPU.
+-   Menjalankan absensi.
+-   Enrollment user.
+-   Benchmark.
+-   Setup/check model.
+-   Verifikasi environment.
+-   Cek kamera.
+-   Clear attendance logs.
 
 ---
 
-### 4. Skrip Setup (`setup_conda.bat`, `run_gpu.bat`, dll.)
+### 4. Skrip Setup (`setup_ineffa.ps1`)
 
--   **`setup_conda.bat`**: Skrip batch untuk Windows yang membuat lingkungan Conda baru, menginstal Python, dan dependensi dari `requirements.txt`.
+-   **`setup_ineffa.ps1`**: Helper setup yang dipanggil dari `ineffa.ps1`. Mode CPU membuat `.venv` dan memakai `uv` untuk memasang `requirements-cpu.txt`. Mode GPU membuat Conda env untuk CUDA/cuDNN, lalu memakai `uv` untuk memasang `requirements-gpu.txt`.
 
--   **`run_gpu.bat`**: Skrip untuk menjalankan aplikasi dengan konfigurasi GPU yang optimal.
-
--   **`scripts/setup_conda_gpu.ps1`**: Skrip PowerShell untuk setup lingkungan Conda dengan dukungan GPU (CUDA/cuDNN).
+-   **`scripts/setup_conda_gpu.ps1`**: Wrapper kompatibilitas lama untuk setup GPU. Untuk penggunaan normal, pakai `ineffa.bat`.
 
 -   **`scripts/setup_gpu_windows.ps1`**: Skrip instalasi driver NVIDIA dan CUDA Toolkit di Windows.
 
--   **`scripts/verify_setup.ps1`**: Memverifikasi instalasi PyTorch dan ketersediaan CUDA.
+-   **`scripts/verify_setup.ps1`**: Memverifikasi instalasi dependency utama dan ketersediaan CUDA.
+
+### 5. `launch.py`
+
+**Tujuan:** Launcher lama berbasis Python. Tetap ada untuk kompatibilitas, tetapi penggunaan utama sekarang lewat `ineffa.bat`.

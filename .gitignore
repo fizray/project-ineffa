@@ -1,8 +1,11 @@
+.venv/
 venv/
 __pycache__/
 .trae/
 snapshots/*
 data/captures/*
+data/attendance.csv
+data/embeddings.json
 attendance.csv
 embeddings.json
 config.yaml
