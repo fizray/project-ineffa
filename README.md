@@ -1,6 +1,6 @@
 # PROJECT INEFFA - Sistem Absensi Wajah Real-time
 
-![Project Ineffa Demo](https://raw.githubusercontent.com/hyacinthlabs/project-ineffa/rebuild/assets/demo.gif)
+![Project Ineffa Demo](https://raw.githubusercontent.com/fizray/project-ineffa/rebuild/assets/demo.gif)
 
 **PROJECT INEFFA** adalah sistem absensi otomatis berbasis pengenalan wajah yang dirancang untuk bekerja secara efisien dan real-time. Aplikasi ini mampu mendeteksi, melacak, dan mengenali wajah dari sumber video langsung (seperti webcam) untuk mencatat kehadiran secara otomatis.
 
@@ -60,7 +60,7 @@ Cara termudah untuk menginstal adalah dengan menggunakan skrip yang disediakan.
 
 1.  **Clone Repositori**
     ```bash
-    git clone https://github.com/hyacinthlabs/project-ineffa.git
+    git clone https://github.com/fizray/project-ineffa.git
     cd project-ineffa
     ```
 
